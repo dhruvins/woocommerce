@@ -72,6 +72,13 @@ abstract class WC_CSV_Exporter {
 	protected $columns_to_export = array();
 
 	/**
+	 * The delimiter parameter sets the field delimiter (one character only).
+	 *
+	 * @var string
+	 */
+	protected $delimiter = ',';
+
+	/**
 	 * Prepare data that will be exported.
 	 */
 	abstract public function prepare_data_to_export();
@@ -108,6 +115,16 @@ abstract class WC_CSV_Exporter {
 	 */
 	public function get_columns_to_export() {
 		return $this->columns_to_export;
+	}
+
+	/**
+	 * Return the delimiter to use in CSV file
+	 *
+	 * @since 3.9.0
+	 * @return string
+	 */
+	public function get_delimiter() {
+		return apply_filters( "woocommerce_{$this->export_type}_export_delimiter", $this->delimiter );
 	}
 
 	/**
@@ -171,7 +188,7 @@ abstract class WC_CSV_Exporter {
 	 */
 	public function send_headers() {
 		if ( function_exists( 'gc_enable' ) ) {
-			gc_enable(); // phpcs:ignore PHPCompatibility.PHP.NewFunctions.gc_enableFound
+			gc_enable(); // phpcs:ignore PHPCompatibility.FunctionUse.NewFunctions.gc_enableFound
 		}
 		if ( function_exists( 'apache_setenv' ) ) {
 			@apache_setenv( 'no-gzip', 1 ); // @codingStandardsIgnoreLine
@@ -245,7 +262,7 @@ abstract class WC_CSV_Exporter {
 			$export_row[] = $this->format_data( $column_name );
 		}
 
-		fputcsv( $buffer, $export_row ); // @codingStandardsIgnoreLine
+		$this->fputcsv( $buffer, $export_row );
 
 		return ob_get_clean();
 	}
@@ -264,7 +281,7 @@ abstract class WC_CSV_Exporter {
 	 * Export rows in CSV format.
 	 *
 	 * @since 3.1.0
-	 * @return array
+	 * @return string
 	 */
 	protected function export_rows() {
 		$data   = $this->get_data_to_export();
@@ -299,7 +316,8 @@ abstract class WC_CSV_Exporter {
 			}
 		}
 
-		fputcsv( $buffer, $export_row ); // @codingStandardsIgnoreLine
+		$this->fputcsv( $buffer, $export_row );
+
 		++ $this->exported_row_count;
 	}
 
@@ -378,7 +396,6 @@ abstract class WC_CSV_Exporter {
 		}
 
 		$use_mb = function_exists( 'mb_convert_encoding' );
-		$data   = (string) urldecode( $data );
 
 		if ( $use_mb ) {
 			$encoding = mb_detect_encoding( $data, 'UTF-8, ISO-8859-1', true );
@@ -394,7 +411,7 @@ abstract class WC_CSV_Exporter {
 	 * @since 3.1.0
 	 * @param  array  $term_ids Term IDs to format.
 	 * @param  string $taxonomy Taxonomy name.
-	 * @return array
+	 * @return string
 	 */
 	public function format_term_ids( $term_ids, $taxonomy ) {
 		$term_ids = wp_parse_id_list( $term_ids );
@@ -455,5 +472,36 @@ abstract class WC_CSV_Exporter {
 		}
 
 		return implode( ', ', $values_to_implode );
+	}
+
+	/**
+	 * Write to the CSV file, ensuring escaping works across versions of
+	 * PHP.
+	 *
+	 * PHP 5.5.4 uses '\' as the default escape character. This is not RFC-4180 compliant.
+	 * \0 disables the escape character.
+	 *
+	 * @see https://bugs.php.net/bug.php?id=43225
+	 * @see https://bugs.php.net/bug.php?id=50686
+	 * @see https://github.com/woocommerce/woocommerce/issues/19514
+	 * @since 3.4.0
+	 * @see https://github.com/woocommerce/woocommerce/issues/24579
+	 * @since 3.9.0
+	 * @param resource $buffer Resource we are writing to.
+	 * @param array    $export_row Row to export.
+	 */
+	protected function fputcsv( $buffer, $export_row ) {
+
+		if ( version_compare( PHP_VERSION, '5.5.4', '<' ) ) {
+			ob_start();
+			$temp = fopen( 'php://output', 'w' ); // @codingStandardsIgnoreLine
+    		fputcsv( $temp, $export_row, $this->get_delimiter(), '"' ); // @codingStandardsIgnoreLine
+			fclose( $temp ); // @codingStandardsIgnoreLine
+			$row = ob_get_clean();
+			$row = str_replace( '\\"', '\\""', $row );
+			fwrite( $buffer, $row ); // @codingStandardsIgnoreLine
+		} else {
+			fputcsv( $buffer, $export_row, $this->get_delimiter(), '"', "\0" ); // @codingStandardsIgnoreLine
+		}
 	}
 }

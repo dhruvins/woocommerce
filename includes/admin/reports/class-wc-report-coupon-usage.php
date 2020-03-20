@@ -205,12 +205,12 @@ class WC_Report_Coupon_Usage extends WC_Admin_Report {
 					);
 
 					if ( ! empty( $used_coupons ) && is_array( $used_coupons ) ) :
-					?>
+						?>
 						<select id="coupon_codes" name="coupon_codes" class="wc-enhanced-select" data-placeholder="<?php esc_attr_e( 'Choose coupons&hellip;', 'woocommerce' ); ?>" style="width:100%;">
 							<option value=""><?php esc_html_e( 'All coupons', 'woocommerce' ); ?></option>
 							<?php
 							foreach ( $used_coupons as $coupon ) {
-								echo '<option value="' . esc_attr( $coupon ) . '" ' . selected( in_array( $coupon, $this->coupon_codes ), true, false ) . '>' . esc_html( $coupon ) . '</option>';
+								echo '<option value="' . esc_attr( $coupon ) . '"' . wc_selected( $coupon, $this->coupon_codes ) . '>' . esc_html( $coupon ) . '</option>';
 							}
 							?>
 						</select>
@@ -455,7 +455,7 @@ class WC_Report_Coupon_Usage extends WC_Admin_Report {
 		$order_discount_amounts = $this->prepare_chart_data( $order_discount_amounts, 'post_date', 'discount_amount', $this->chart_interval, $this->start_date, $this->chart_groupby );
 
 		// Encode in json format.
-		$chart_data = json_encode(
+		$chart_data = wp_json_encode(
 			array(
 				'order_coupon_counts'    => array_values( $order_coupon_counts ),
 				'order_discount_amounts' => array_values( $order_discount_amounts ),
@@ -469,7 +469,7 @@ class WC_Report_Coupon_Usage extends WC_Admin_Report {
 			var main_chart;
 
 			jQuery(function(){
-				var order_data = jQuery.parseJSON( '<?php echo $chart_data; ?>' );<?php // @codingStandardsIgnoreLine ?>
+				var order_data = JSON.parse( decodeURIComponent( '<?php echo rawurlencode( $chart_data ); ?>' ) );
 
 				var drawGraph = function( highlight ) {
 					var series = [
@@ -525,7 +525,7 @@ class WC_Report_Coupon_Usage extends WC_Admin_Report {
 								tickColor: 'transparent',
 								mode: "time",
 								timeformat: "<?php echo ( 'day' === $this->chart_groupby ) ? '%d %b' : '%b'; ?>",
-								monthNames: <?php echo json_encode( array_values( $wp_locale->month_abbrev ) ); ?>,
+								monthNames: JSON.parse( decodeURIComponent( '<?php echo rawurlencode( wp_json_encode( array_values( $wp_locale->month_abbrev ) ) ); ?>' ) ),
 								tickLength: 1,
 								minTickSize: [1, "<?php echo esc_js( $this->chart_groupby ); ?>"],
 								font: {

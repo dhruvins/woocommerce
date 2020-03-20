@@ -13,7 +13,7 @@
  *
  * @since 2.2
  */
-class WC_Unit_Test_Case extends WP_UnitTestCase {
+class WC_Unit_Test_Case extends WP_HTTP_TestCase {
 
 	/**
 	 * Holds the WC_Unit_Test_Factory instance.
@@ -42,6 +42,18 @@ class WC_Unit_Test_Case extends WP_UnitTestCase {
 		// Register post types before each test.
 		WC_Post_types::register_post_types();
 		WC_Post_types::register_taxonomies();
+	}
+
+	/**
+	 * Set up class unit test.
+	 *
+	 * @since 3.5.0
+	 */
+	public static function setUpBeforeClass() {
+		parent::setUpBeforeClass();
+
+		// Terms are deleted in WP_UnitTestCase::tearDownAfterClass, then e.g. Uncategorized product_cat is missing.
+		WC_Install::create_terms();
 	}
 
 	/**
@@ -74,27 +86,6 @@ class WC_Unit_Test_Case extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Asserts thing is not WP_Error.
-	 *
-	 * @since 2.2
-	 * @param mixed  $actual  The object to assert is not an instance of WP_Error.
-	 * @param string $message A message to display if the assertion fails.
-	 */
-	public function assertNotWPError( $actual, $message = '' ) {
-		$this->assertNotInstanceOf( 'WP_Error', $actual, $message );
-	}
-
-	/**
-	 * Asserts thing is WP_Error.
-	 *
-	 * @param mixed  $actual  The object to assert is an instance of WP_Error.
-	 * @param string $message A message to display if the assertion fails.
-	 */
-	public function assertIsWPError( $actual, $message = '' ) {
-		$this->assertInstanceOf( 'WP_Error', $actual, $message );
-	}
-
-	/**
 	 * Throws an exception with an optional message and code.
 	 *
 	 * Note: can't use `throwException` as that's reserved.
@@ -107,24 +98,5 @@ class WC_Unit_Test_Case extends WP_UnitTestCase {
 	public function throwAnException( $message = null, $code = null ) {
 		$message = $message ? $message : "We're all doomed!";
 		throw new Exception( $message, $code );
-	}
-
-	/**
-	 * Backport assertNotFalse to PHPUnit 3.6.12 which only runs in PHP 5.2.
-	 *
-	 * @since  2.2
-	 * @param  mixed  $condition The statement to evaluate as not false.
-	 * @param  string $message   A message to display if the assertion fails.
-	 */
-	public static function assertNotFalse( $condition, $message = '' ) {
-
-		if ( version_compare( phpversion(), '5.3', '<' ) ) {
-
-			self::assertThat( $condition, self::logicalNot( self::isFalse() ), $message );
-
-		} else {
-
-			parent::assertNotFalse( $condition, $message );
-		}
 	}
 }

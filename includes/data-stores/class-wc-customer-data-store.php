@@ -64,6 +64,7 @@ class WC_Customer_Data_Store extends WC_Data_Store_WP implements WC_Customer_Dat
 		'syntax_highlighting',
 		'_order_count',
 		'_money_spent',
+		'_woocommerce_tracks_anon_id',
 	);
 
 	/**
@@ -117,11 +118,13 @@ class WC_Customer_Data_Store extends WC_Data_Store_WP implements WC_Customer_Dat
 
 		wp_update_user(
 			apply_filters(
-				'woocommerce_update_customer_args', array(
+				'woocommerce_update_customer_args',
+				array(
 					'ID'           => $customer->get_id(),
 					'role'         => $customer->get_role(),
 					'display_name' => $customer->get_display_name(),
-				), $customer
+				),
+				$customer
 			)
 		);
 		$wp_user = new WP_User( $customer->get_id() );
@@ -129,7 +132,7 @@ class WC_Customer_Data_Store extends WC_Data_Store_WP implements WC_Customer_Dat
 		$customer->set_date_modified( get_user_meta( $customer->get_id(), 'last_update', true ) );
 		$customer->save_meta_data();
 		$customer->apply_changes();
-		do_action( 'woocommerce_new_customer', $customer->get_id() );
+		do_action( 'woocommerce_new_customer', $customer->get_id(), $customer );
 	}
 
 	/**
@@ -147,14 +150,14 @@ class WC_Customer_Data_Store extends WC_Data_Store_WP implements WC_Customer_Dat
 			throw new Exception( __( 'Invalid customer.', 'woocommerce' ) );
 		}
 
-		// Only users on this site should be read.
-		if ( is_multisite() && ! is_user_member_of_blog( $customer->get_id() ) ) {
-			throw new Exception( __( 'Invalid customer.', 'woocommerce' ) );
-		}
-
 		$customer_id = $customer->get_id();
+
 		// Load meta but exclude deprecated props.
-		$user_meta = array_diff_key( array_map( 'wc_flatten_meta_callback', get_user_meta( $customer_id ) ), array_flip( array( 'country', 'state', 'postcode', 'city', 'address', 'address_2', 'default', 'location' ) ) );
+		$user_meta = array_diff_key(
+			array_change_key_case( array_map( 'wc_flatten_meta_callback', get_user_meta( $customer_id ) ) ),
+			array_flip( array( 'country', 'state', 'postcode', 'city', 'address', 'address_2', 'default', 'location' ) )
+		);
+
 		$customer->set_props( $user_meta );
 		$customer->set_props(
 			array(
@@ -181,13 +184,16 @@ class WC_Customer_Data_Store extends WC_Data_Store_WP implements WC_Customer_Dat
 	public function update( &$customer ) {
 		wp_update_user(
 			apply_filters(
-				'woocommerce_update_customer_args', array(
+				'woocommerce_update_customer_args',
+				array(
 					'ID'           => $customer->get_id(),
 					'user_email'   => $customer->get_email(),
 					'display_name' => $customer->get_display_name(),
-				), $customer
+				),
+				$customer
 			)
 		);
+
 		// Only update password if a new one was set with set_password.
 		if ( $customer->get_password() ) {
 			wp_update_user(
@@ -198,11 +204,12 @@ class WC_Customer_Data_Store extends WC_Data_Store_WP implements WC_Customer_Dat
 			);
 			$customer->set_password( '' );
 		}
+
 		$this->update_user_meta( $customer );
 		$customer->set_date_modified( get_user_meta( $customer->get_id(), 'last_update', true ) );
 		$customer->save_meta_data();
 		$customer->apply_changes();
-		do_action( 'woocommerce_update_customer', $customer->get_id() );
+		do_action( 'woocommerce_update_customer', $customer->get_id(), $customer );
 	}
 
 	/**
@@ -216,8 +223,10 @@ class WC_Customer_Data_Store extends WC_Data_Store_WP implements WC_Customer_Dat
 		if ( ! $customer->get_id() ) {
 			return;
 		}
+
 		$args = wp_parse_args(
-			$args, array(
+			$args,
+			array(
 				'reassign' => 0,
 			)
 		);
@@ -270,9 +279,11 @@ class WC_Customer_Data_Store extends WC_Data_Store_WP implements WC_Customer_Dat
 
 		foreach ( $billing_address_props as $meta_key => $prop ) {
 			$prop_key = substr( $prop, 8 );
+
 			if ( ! isset( $changed_props['billing'] ) || ! array_key_exists( $prop_key, $changed_props['billing'] ) ) {
 				continue;
 			}
+
 			if ( update_user_meta( $customer->get_id(), $meta_key, $customer->{"get_$prop"}( 'edit' ) ) ) {
 				$updated_props[] = $prop;
 			}
@@ -292,9 +303,11 @@ class WC_Customer_Data_Store extends WC_Data_Store_WP implements WC_Customer_Dat
 
 		foreach ( $shipping_address_props as $meta_key => $prop ) {
 			$prop_key = substr( $prop, 9 );
+
 			if ( ! isset( $changed_props['shipping'] ) || ! array_key_exists( $prop_key, $changed_props['shipping'] ) ) {
 				continue;
 			}
+
 			if ( update_user_meta( $customer->get_id(), $meta_key, $customer->{"get_$prop"}( 'edit' ) ) ) {
 				$updated_props[] = $prop;
 			}
@@ -314,7 +327,7 @@ class WC_Customer_Data_Store extends WC_Data_Store_WP implements WC_Customer_Dat
 		global $wpdb;
 
 		$last_order = $wpdb->get_var(
-			// phpcs:disable WordPress.WP.PreparedSQL.NotPrepared
+			// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared
 			"SELECT posts.ID
 			FROM $wpdb->posts AS posts
 			LEFT JOIN {$wpdb->postmeta} AS meta on posts.ID = meta.post_id
@@ -326,11 +339,11 @@ class WC_Customer_Data_Store extends WC_Data_Store_WP implements WC_Customer_Dat
 			// phpcs:enable
 		);
 
-		if ( $last_order ) {
-			return wc_get_order( absint( $last_order ) );
-		} else {
+		if ( ! $last_order ) {
 			return false;
 		}
+
+		return wc_get_order( absint( $last_order ) );
 	}
 
 	/**
@@ -347,7 +360,7 @@ class WC_Customer_Data_Store extends WC_Data_Store_WP implements WC_Customer_Dat
 			global $wpdb;
 
 			$count = $wpdb->get_var(
-				// phpcs:disable WordPress.WP.PreparedSQL.NotPrepared
+				// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared
 				"SELECT COUNT(*)
 				FROM $wpdb->posts as posts
 				LEFT JOIN {$wpdb->postmeta} AS meta ON posts.ID = meta.post_id
@@ -371,14 +384,18 @@ class WC_Customer_Data_Store extends WC_Data_Store_WP implements WC_Customer_Dat
 	 * @return float
 	 */
 	public function get_total_spent( &$customer ) {
-		$spent = apply_filters( 'woocommerce_customer_get_total_spent', get_user_meta( $customer->get_id(), '_money_spent', true ), $customer );
+		$spent = apply_filters(
+			'woocommerce_customer_get_total_spent',
+			get_user_meta( $customer->get_id(), '_money_spent', true ),
+			$customer
+		);
 
 		if ( '' === $spent ) {
 			global $wpdb;
 
 			$statuses = array_map( 'esc_sql', wc_get_is_paid_statuses() );
 			$spent    = $wpdb->get_var(
-				// phpcs:disable WordPress.WP.PreparedSQL.NotPrepared
+				// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared
 				apply_filters(
 					'woocommerce_customer_get_total_spent_query',
 					"SELECT SUM(meta2.meta_value)
@@ -421,18 +438,23 @@ class WC_Customer_Data_Store extends WC_Data_Store_WP implements WC_Customer_Dat
 
 		$query = new WP_User_Query(
 			apply_filters(
-				'woocommerce_customer_search_customers', array(
+				'woocommerce_customer_search_customers',
+				array(
 					'search'         => '*' . esc_attr( $term ) . '*',
 					'search_columns' => array( 'user_login', 'user_url', 'user_email', 'user_nicename', 'display_name' ),
 					'fields'         => 'ID',
 					'number'         => $limit,
-				), $term, $limit, 'main_query'
+				),
+				$term,
+				$limit,
+				'main_query'
 			)
 		);
 
 		$query2 = new WP_User_Query(
 			apply_filters(
-				'woocommerce_customer_search_customers', array(
+				'woocommerce_customer_search_customers',
+				array(
 					'fields'     => 'ID',
 					'number'     => $limit,
 					'meta_query' => array(
@@ -448,7 +470,10 @@ class WC_Customer_Data_Store extends WC_Data_Store_WP implements WC_Customer_Dat
 							'compare' => 'LIKE',
 						),
 					),
-				), $term, $limit, 'meta_query'
+				),
+				$term,
+				$limit,
+				'meta_query'
 			)
 		);
 
@@ -459,5 +484,29 @@ class WC_Customer_Data_Store extends WC_Data_Store_WP implements WC_Customer_Dat
 		}
 
 		return $results;
+	}
+
+	/**
+	 * Get all user ids who have `billing_email` set to any of the email passed in array.
+	 *
+	 * @param array $emails List of emails to check against.
+	 *
+	 * @return array
+	 */
+	public function get_user_ids_for_billing_email( $emails ) {
+		$emails = array_unique( array_map( 'strtolower', array_map( 'sanitize_email', $emails ) ) );
+		$users_query = new WP_User_Query(
+			array(
+				'fields'     => 'ID',
+				'meta_query' => array(
+					array(
+						'key'     => 'billing_email',
+						'value'   => $emails,
+						'compare' => 'IN',
+					),
+				),
+			)
+		);
+		return array_unique( $users_query->get_results() );
 	}
 }

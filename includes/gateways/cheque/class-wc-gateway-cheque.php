@@ -29,7 +29,7 @@ class WC_Gateway_Cheque extends WC_Payment_Gateway {
 		$this->icon               = apply_filters( 'woocommerce_cheque_icon', '' );
 		$this->has_fields         = false;
 		$this->method_title       = _x( 'Check payments', 'Check payment method', 'woocommerce' );
-		$this->method_description = __( 'Allows check payments. Why would you take checks in this day and age? Well you probably would not, but it does allow you to make test purchases for testing order emails and the success pages.', 'woocommerce' );
+		$this->method_description = __( 'Take payments in person via checks. This offline gateway can also be useful to test purchases.', 'woocommerce' );
 
 		// Load the settings.
 		$this->init_form_fields();
@@ -119,13 +119,10 @@ class WC_Gateway_Cheque extends WC_Payment_Gateway {
 
 		if ( $order->get_total() > 0 ) {
 			// Mark as on-hold (we're awaiting the cheque).
-			$order->update_status( 'on-hold', _x( 'Awaiting check payment', 'Check payment method', 'woocommerce' ) );
+			$order->update_status( apply_filters( 'woocommerce_cheque_process_payment_order_status', 'on-hold', $order ), _x( 'Awaiting check payment', 'Check payment method', 'woocommerce' ) );
 		} else {
 			$order->payment_complete();
 		}
-
-		// Reduce stock levels.
-		wc_reduce_stock_levels( $order_id );
 
 		// Remove cart.
 		WC()->cart->empty_cart();

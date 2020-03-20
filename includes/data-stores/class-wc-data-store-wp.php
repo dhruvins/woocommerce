@@ -1,27 +1,24 @@
 <?php
 /**
- * Class WC_Data_Store_WP file.
- *
- * @package WooCommerce\DataStores
- */
-
-if ( ! defined( 'ABSPATH' ) ) {
-	exit;
-}
-
-/**
  * Shared logic for WP based data.
  * Contains functions like meta handling for all default data stores.
  * Your own data store doesn't need to use WC_Data_Store_WP -- you can write
  * your own meta handling functions.
  *
- * @version  3.0.0
+ * @version 3.0.0
+ * @package WooCommerce/Classes
+ */
+
+defined( 'ABSPATH' ) || exit;
+
+/**
+ * WC_Data_Store_WP class.
  */
 class WC_Data_Store_WP {
 
 	/**
 	 * Meta type. This should match up with
-	 * the types available at https://codex.wordpress.org/Function_Reference/add_metadata.
+	 * the types available at https://developer.wordpress.org/reference/functions/add_metadata/.
 	 * WP defines 'post', 'user', 'comment', and 'term'.
 	 *
 	 * @var string
@@ -41,9 +38,19 @@ class WC_Data_Store_WP {
 	 * Data stored in meta keys, but not considered "meta" for an object.
 	 *
 	 * @since 3.0.0
+	 *
 	 * @var array
 	 */
 	protected $internal_meta_keys = array();
+
+	/**
+	 * Meta data which should exist in the DB, even if empty.
+	 *
+	 * @since 3.6.0
+	 *
+	 * @var array
+	 */
+	protected $must_exist_meta_keys = array();
 
 	/**
 	 * Get and store terms from a taxonomy.
@@ -78,7 +85,7 @@ class WC_Data_Store_WP {
 		$db_info       = $this->get_db_info();
 		$raw_meta_data = $wpdb->get_results(
 			$wpdb->prepare(
-				// phpcs:disable WordPress.WP.PreparedSQL.NotPrepared
+				// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared
 				"SELECT {$db_info['meta_id_field']} as meta_id, meta_key, meta_value
 				FROM {$db_info['table']}
 				WHERE {$db_info['object_id_field']} = %d
@@ -171,7 +178,6 @@ class WC_Data_Store_WP {
 	 * @since 2.6.0
 	 *
 	 * @param string $key Prefix to be added to meta keys.
-	 *
 	 * @return string
 	 */
 	protected function prefix_key( $key ) {
@@ -212,6 +218,33 @@ class WC_Data_Store_WP {
 	}
 
 	/**
+	 * Update meta data in, or delete it from, the database.
+	 *
+	 * Avoids storing meta when it's either an empty string or empty array.
+	 * Other empty values such as numeric 0 and null should still be stored.
+	 * Data-stores can force meta to exist using `must_exist_meta_keys`.
+	 *
+	 * Note: WordPress `get_metadata` function returns an empty string when meta data does not exist.
+	 *
+	 * @param WC_Data $object The WP_Data object (WC_Coupon for coupons, etc).
+	 * @param string  $meta_key Meta key to update.
+	 * @param mixed   $meta_value Value to save.
+	 *
+	 * @since 3.6.0 Added to prevent empty meta being stored unless required.
+	 *
+	 * @return bool True if updated/deleted.
+	 */
+	protected function update_or_delete_post_meta( $object, $meta_key, $meta_value ) {
+		if ( in_array( $meta_value, array( array(), '' ), true ) && ! in_array( $meta_key, $this->must_exist_meta_keys, true ) ) {
+			$updated = delete_post_meta( $object->get_id(), $meta_key );
+		} else {
+			$updated = update_post_meta( $object->get_id(), $meta_key, $meta_value );
+		}
+
+		return (bool) $updated;
+	}
+
+	/**
 	 * Get valid WP_Query args from a WC_Object_Query's query variables.
 	 *
 	 * @since 3.1.0
@@ -223,7 +256,7 @@ class WC_Data_Store_WP {
 		$skipped_values = array( '', array(), null );
 		$wp_query_args  = array(
 			'errors'     => array(),
-			'meta_query' => array(), // phpcs:ignore WordPress.VIP.SlowDBQuery.slow_db_query_meta_query
+			'meta_query' => array(), // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query
 		);
 
 		foreach ( $query_vars as $key => $value ) {
@@ -233,11 +266,26 @@ class WC_Data_Store_WP {
 
 			// Build meta queries out of vars that are stored in internal meta keys.
 			if ( in_array( '_' . $key, $this->internal_meta_keys, true ) ) {
-				$wp_query_args['meta_query'][] = array(
-					'key'     => '_' . $key,
-					'value'   => $value,
-					'compare' => '=',
-				);
+				// Check for existing values if wildcard is used.
+				if ( '*' === $value ) {
+					$wp_query_args['meta_query'][] = array(
+						array(
+							'key'     => '_' . $key,
+							'compare' => 'EXISTS',
+						),
+						array(
+							'key'     => '_' . $key,
+							'value'   => '',
+							'compare' => '!=',
+						),
+					);
+				} else {
+					$wp_query_args['meta_query'][] = array(
+						'key'     => '_' . $key,
+						'value'   => $value,
+						'compare' => is_array( $value ) ? 'IN' : '=',
+					);
+				}
 			} else { // Other vars get mapped to wp_query args or just left alone.
 				$key_mapping = array(
 					'parent'         => 'post_parent',
@@ -366,7 +414,7 @@ class WC_Data_Store_WP {
 
 		// Build meta query for unrecognized keys.
 		if ( ! isset( $wp_query_args['meta_query'] ) ) {
-			$wp_query_args['meta_query'] = array(); // phpcs:ignore WordPress.VIP.SlowDBQuery.slow_db_query_meta_query
+			$wp_query_args['meta_query'] = array(); // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query
 		}
 
 		// Meta dates are stored as timestamps in the db.
@@ -383,7 +431,6 @@ class WC_Data_Store_WP {
 						'compare' => $operator,
 					);
 					break;
-
 				case '<':
 				case '>=':
 					$wp_query_args['meta_query'][] = array(
@@ -392,7 +439,6 @@ class WC_Data_Store_WP {
 						'compare' => $operator,
 					);
 					break;
-
 				default:
 					$wp_query_args['meta_query'][] = array(
 						'key'     => $key,
@@ -437,5 +483,151 @@ class WC_Data_Store_WP {
 	 */
 	public function get_internal_meta_keys() {
 		return $this->internal_meta_keys;
+	}
+
+	/**
+	 * Check if the terms are suitable for searching.
+	 *
+	 * Uses an array of stopwords (terms) that are excluded from the separate
+	 * term matching when searching for posts. The list of English stopwords is
+	 * the approximate search engines list, and is translatable.
+	 *
+	 * @since 3.4.0
+	 * @param array $terms Terms to check.
+	 * @return array Terms that are not stopwords.
+	 */
+	protected function get_valid_search_terms( $terms ) {
+		$valid_terms = array();
+		$stopwords   = $this->get_search_stopwords();
+
+		foreach ( $terms as $term ) {
+			// keep before/after spaces when term is for exact match, otherwise trim quotes and spaces.
+			if ( preg_match( '/^".+"$/', $term ) ) {
+				$term = trim( $term, "\"'" );
+			} else {
+				$term = trim( $term, "\"' " );
+			}
+
+			// Avoid single A-Z and single dashes.
+			if ( empty( $term ) || ( 1 === strlen( $term ) && preg_match( '/^[a-z\-]$/i', $term ) ) ) {
+				continue;
+			}
+
+			if ( in_array( wc_strtolower( $term ), $stopwords, true ) ) {
+				continue;
+			}
+
+			$valid_terms[] = $term;
+		}
+
+		return $valid_terms;
+	}
+
+	/**
+	 * Retrieve stopwords used when parsing search terms.
+	 *
+	 * @since 3.4.0
+	 * @return array Stopwords.
+	 */
+	protected function get_search_stopwords() {
+		// Translators: This is a comma-separated list of very common words that should be excluded from a search, like a, an, and the. These are usually called "stopwords". You should not simply translate these individual words into your language. Instead, look for and provide commonly accepted stopwords in your language.
+		$stopwords = array_map(
+			'wc_strtolower',
+			array_map(
+				'trim',
+				explode(
+					',',
+					_x(
+						'about,an,are,as,at,be,by,com,for,from,how,in,is,it,of,on,or,that,the,this,to,was,what,when,where,who,will,with,www',
+						'Comma-separated list of search stopwords in your language',
+						'woocommerce'
+					)
+				)
+			)
+		);
+
+		return apply_filters( 'wp_search_stopwords', $stopwords );
+	}
+
+	/**
+	 * Get data to save to a lookup table.
+	 *
+	 * @since 3.6.0
+	 * @param int    $id ID of object to update.
+	 * @param string $table Lookup table name.
+	 * @return array
+	 */
+	protected function get_data_for_lookup_table( $id, $table ) {
+		return array();
+	}
+
+	/**
+	 * Get primary key name for lookup table.
+	 *
+	 * @since 3.6.0
+	 * @param string $table Lookup table name.
+	 * @return string
+	 */
+	protected function get_primary_key_for_lookup_table( $table ) {
+		return '';
+	}
+
+	/**
+	 * Update a lookup table for an object.
+	 *
+	 * @since 3.6.0
+	 * @param int    $id ID of object to update.
+	 * @param string $table Lookup table name.
+	 *
+	 * @return NULL
+	 */
+	protected function update_lookup_table( $id, $table ) {
+		global $wpdb;
+
+		$id    = absint( $id );
+		$table = sanitize_key( $table );
+
+		if ( empty( $id ) || empty( $table ) ) {
+			return false;
+		}
+
+		$existing_data = wp_cache_get( 'lookup_table', 'object_' . $id );
+		$update_data   = $this->get_data_for_lookup_table( $id, $table );
+
+		if ( ! empty( $update_data ) && $update_data !== $existing_data ) {
+			$wpdb->replace(
+				$wpdb->$table,
+				$update_data
+			);
+			wp_cache_set( 'lookup_table', $update_data, 'object_' . $id );
+		}
+	}
+
+	/**
+	 * Delete lookup table data for an ID.
+	 *
+	 * @since 3.6.0
+	 * @param int    $id ID of object to update.
+	 * @param string $table Lookup table name.
+	 */
+	public function delete_from_lookup_table( $id, $table ) {
+		global $wpdb;
+
+		$id    = absint( $id );
+		$table = sanitize_key( $table );
+
+		if ( empty( $id ) || empty( $table ) ) {
+			return false;
+		}
+
+		$pk = $this->get_primary_key_for_lookup_table( $table );
+
+		$wpdb->delete(
+			$wpdb->$table,
+			array(
+				$pk => $id,
+			)
+		);
+		wp_cache_delete( 'lookup_table', 'object_' . $id );
 	}
 }

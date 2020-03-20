@@ -1,8 +1,11 @@
 <?php
+/**
+ * Tax settings.
+ *
+ * @package Settings.
+ */
 
-if ( ! defined( 'ABSPATH' ) ) {
-	exit;
-}
+defined( 'ABSPATH' ) || exit;
 
 $settings = array(
 
@@ -47,7 +50,7 @@ $settings = array(
 		'default'  => 'inherit',
 		'type'     => 'select',
 		'class'    => 'wc-enhanced-select',
-		'options'  => array_merge( array( 'inherit' => __( 'Shipping tax class based on cart items', 'woocommerce' ) ), wc_get_product_tax_class_options() ),
+		'options'  => array( 'inherit' => __( 'Shipping tax class based on cart items', 'woocommerce' ) ) + wc_get_product_tax_class_options(),
 		'desc_tip' => true,
 	),
 
@@ -60,12 +63,14 @@ $settings = array(
 	),
 
 	array(
-		'title'    => __( 'Additional tax classes', 'woocommerce' ),
-		'desc_tip' => __( 'List additional tax classes below (1 per line). This is in addition to the default "Standard rate".', 'woocommerce' ),
-		'id'       => 'woocommerce_tax_classes',
-		'css'      => 'width:100%; height: 65px;',
-		'type'     => 'textarea',
-		'default'  => sprintf( __( 'Reduced rate%sZero rate', 'woocommerce' ), PHP_EOL ),
+		'title'     => __( 'Additional tax classes', 'woocommerce' ),
+		'desc_tip'  => __( 'List additional tax classes you need below (1 per line, e.g. Reduced Rates). These are in addition to "Standard rate" which exists by default.', 'woocommerce' ),
+		'id'        => 'woocommerce_tax_classes',
+		'css'       => 'height: 65px;',
+		'type'      => 'textarea',
+		'default'   => '',
+		'is_option' => false,
+		'value'     => implode( "\n", WC_Tax::get_tax_classes() ),
 	),
 
 	array(
@@ -81,16 +86,15 @@ $settings = array(
 	),
 
 	array(
-		'title'    => __( 'Display prices during cart and checkout', 'woocommerce' ),
-		'id'       => 'woocommerce_tax_display_cart',
-		'default'  => 'excl',
-		'type'     => 'select',
-		'class'    => 'wc-enhanced-select',
-		'options'  => array(
+		'title'   => __( 'Display prices during cart and checkout', 'woocommerce' ),
+		'id'      => 'woocommerce_tax_display_cart',
+		'default' => 'excl',
+		'type'    => 'select',
+		'class'   => 'wc-enhanced-select',
+		'options' => array(
 			'incl' => __( 'Including tax', 'woocommerce' ),
 			'excl' => __( 'Excluding tax', 'woocommerce' ),
 		),
-		'autoload' => false,
 	),
 
 	array(

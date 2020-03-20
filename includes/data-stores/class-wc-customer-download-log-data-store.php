@@ -2,17 +2,14 @@
 /**
  * Class WC_Customer_Download_Log_Data_Store file.
  *
- * @package WooCommerce\DataStores
+ * @version  3.3.0
+ * @package WooCommerce\Classes
  */
 
-if ( ! defined( 'ABSPATH' ) ) {
-	exit;
-}
+defined( 'ABSPATH' ) || exit;
 
 /**
- * WC Customer Download Log Data Store.
- *
- * @version  3.3.0
+ * WC_Customer_Download_Log_Data_Store class.
  */
 class WC_Customer_Download_Log_Data_Store implements WC_Customer_Download_Log_Data_Store_Interface {
 
@@ -38,7 +35,7 @@ class WC_Customer_Download_Log_Data_Store implements WC_Customer_Download_Log_Da
 
 		// Always set a timestamp.
 		if ( is_null( $download_log->get_timestamp( 'edit' ) ) ) {
-			$download_log->set_timestamp( current_time( 'timestamp', true ) );
+			$download_log->set_timestamp( time() );
 		}
 
 		$data = array(
@@ -74,9 +71,8 @@ class WC_Customer_Download_Log_Data_Store implements WC_Customer_Download_Log_Da
 	/**
 	 * Method to read a download log from the database.
 	 *
-	 * @param WC_Customer_Download_Log $download_log Customer download log object.
-	 *
-	 * @throws Exception If invalid download log.
+	 * @param WC_Customer_Download_Log $download_log Download log object.
+	 * @throws Exception Exception when read is not possible.
 	 */
 	public function read( &$download_log ) {
 		global $wpdb;
@@ -88,13 +84,11 @@ class WC_Customer_Download_Log_Data_Store implements WC_Customer_Download_Log_Da
 			throw new Exception( __( 'Invalid download log: no ID.', 'woocommerce' ) );
 		}
 
+		$table = $wpdb->prefix . self::get_table_name();
+
 		// Query the DB for the download log.
-		$raw_download_log = $wpdb->get_row(
-			$wpdb->prepare(
-				"SELECT * FROM {$wpdb->prefix}" . self::get_table_name() . ' WHERE download_log_id = %d', // phpcs:ignore WordPress.WP.PreparedSQL.NotPrepared
-				$download_log->get_id()
-			)
-		);
+		$raw_download_log = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE download_log_id = %d", $download_log->get_id() ) ); // WPCS: unprepared SQL ok.
+
 		if ( ! $raw_download_log ) {
 			throw new Exception( __( 'Invalid download log: not found.', 'woocommerce' ) );
 		}
@@ -114,7 +108,7 @@ class WC_Customer_Download_Log_Data_Store implements WC_Customer_Download_Log_Da
 	/**
 	 * Method to update a download log in the database.
 	 *
-	 * @param WC_Customer_Download_Log $download_log Customer download log object.
+	 * @param WC_Customer_Download_Log $download_log Download log object.
 	 */
 	public function update( &$download_log ) {
 		global $wpdb;
@@ -164,19 +158,22 @@ class WC_Customer_Download_Log_Data_Store implements WC_Customer_Download_Log_Da
 		global $wpdb;
 
 		$args = wp_parse_args(
-			$args, array(
+			$args,
+			array(
 				'permission_id'   => '',
 				'user_id'         => '',
 				'user_ip_address' => '',
 				'orderby'         => 'download_log_id',
-				'order'           => 'DESC',
+				'order'           => 'ASC',
 				'limit'           => -1,
+				'page'            => 1,
 				'return'          => 'objects',
 			)
 		);
 
 		$query   = array();
-		$query[] = "SELECT * FROM {$wpdb->prefix}" . self::get_table_name() . ' WHERE 1=1';
+		$table   = $wpdb->prefix . self::get_table_name();
+		$query[] = "SELECT * FROM {$table} WHERE 1=1";
 
 		if ( $args['permission_id'] ) {
 			$query[] = $wpdb->prepare( 'AND permission_id = %d', $args['permission_id'] );
@@ -191,16 +188,16 @@ class WC_Customer_Download_Log_Data_Store implements WC_Customer_Download_Log_Da
 		}
 
 		$allowed_orders = array( 'download_log_id', 'timestamp', 'permission_id', 'user_id' );
-		$order          = in_array( $args['order'], $allowed_orders, true ) ? $args['order'] : 'download_log_id';
-		$orderby        = 'DESC' === strtoupper( $args['orderby'] ) ? 'DESC' : 'ASC';
-		$orderby_sql    = sanitize_sql_orderby( "{$order} {$orderby}" );
+		$orderby        = in_array( $args['orderby'], $allowed_orders, true ) ? $args['orderby'] : 'download_log_id';
+		$order          = 'DESC' === strtoupper( $args['order'] ) ? 'DESC' : 'ASC';
+		$orderby_sql    = sanitize_sql_orderby( "{$orderby} {$order}" );
 		$query[]        = "ORDER BY {$orderby_sql}";
 
 		if ( 0 < $args['limit'] ) {
-			$query[] = $wpdb->prepare( 'LIMIT %d', $args['limit'] );
+			$query[] = $wpdb->prepare( 'LIMIT %d, %d', absint( $args['limit'] ) * absint( $args['page'] - 1 ), absint( $args['limit'] ) );
 		}
 
-		$raw_download_logs = $wpdb->get_results( implode( ' ', $query ) ); // phpcs:ignore WordPress.WP.PreparedSQL.NotPrepared
+		$raw_download_logs = $wpdb->get_results( implode( ' ', $query ) ); // WPCS: unprepared SQL ok.
 
 		switch ( $args['return'] ) {
 			case 'ids':
@@ -213,7 +210,7 @@ class WC_Customer_Download_Log_Data_Store implements WC_Customer_Download_Log_Da
 	/**
 	 * Get download logs for a given download permission.
 	 *
-	 * @param  int $permission_id Permission ID.
+	 * @param int $permission_id Permission to get logs for.
 	 * @return array
 	 */
 	public function get_download_logs_for_permission( $permission_id ) {
@@ -229,4 +226,14 @@ class WC_Customer_Download_Log_Data_Store implements WC_Customer_Download_Log_Da
 		);
 	}
 
+	/**
+	 * Method to delete download logs for a given permission ID.
+	 *
+	 * @since 3.4.0
+	 * @param int $id download_id of the downloads that will be deleted.
+	 */
+	public function delete_by_permission_id( $id ) {
+		global $wpdb;
+		$wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->prefix}woocommerce_downloadable_product_permissions WHERE permission_id = %d", $id ) );
+	}
 }

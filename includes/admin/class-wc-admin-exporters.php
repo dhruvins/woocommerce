@@ -6,6 +6,8 @@
  * @version     3.1.0
  */
 
+use Automattic\Jetpack\Constants;
+
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
@@ -26,6 +28,10 @@ class WC_Admin_Exporters {
 	 * Constructor.
 	 */
 	public function __construct() {
+		if ( ! $this->export_allowed() ) {
+			return;
+		}
+
 		add_action( 'admin_menu', array( $this, 'add_to_menus' ) );
 		add_action( 'admin_head', array( $this, 'hide_from_menus' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'admin_scripts' ) );
@@ -36,9 +42,18 @@ class WC_Admin_Exporters {
 		$this->exporters['product_exporter'] = array(
 			'menu'       => 'edit.php?post_type=product',
 			'name'       => __( 'Product Export', 'woocommerce' ),
-			'capability' => 'edit_products',
+			'capability' => 'export',
 			'callback'   => array( $this, 'product_exporter' ),
 		);
+	}
+
+	/**
+	 * Return true if WooCommerce export is allowed for current user, false otherwise.
+	 *
+	 * @return bool Whether current user can perform export.
+	 */
+	protected function export_allowed() {
+		return current_user_can( 'edit_products' ) && current_user_can( 'export' );
 	}
 
 	/**
@@ -71,8 +86,9 @@ class WC_Admin_Exporters {
 	 * Enqueue scripts.
 	 */
 	public function admin_scripts() {
-		$suffix = defined( 'SCRIPT_DEBUG' ) && SCRIPT_DEBUG ? '' : '.min';
-		wp_register_script( 'wc-product-export', WC()->plugin_url() . '/assets/js/admin/wc-product-export' . $suffix . '.js', array( 'jquery' ), WC_VERSION );
+		$suffix  = Constants::is_true( 'SCRIPT_DEBUG' ) ? '' : '.min';
+		$version = Constants::get_constant( 'WC_VERSION' );
+		wp_register_script( 'wc-product-export', WC()->plugin_url() . '/assets/js/admin/wc-product-export' . $suffix . '.js', array( 'jquery' ), $version );
 		wp_localize_script(
 			'wc-product-export',
 			'wc_product_export_params',
@@ -112,8 +128,8 @@ class WC_Admin_Exporters {
 	public function do_ajax_product_export() {
 		check_ajax_referer( 'wc-product-export', 'security' );
 
-		if ( ! current_user_can( 'edit_products' ) ) {
-			wp_die( -1 );
+		if ( ! $this->export_allowed() ) {
+			wp_send_json_error( array( 'message' => __( 'Insufficient privileges to export products.', 'woocommerce' ) ) );
 		}
 
 		include_once WC_ABSPATH . 'includes/export/class-wc-product-csv-exporter.php';
@@ -135,6 +151,10 @@ class WC_Admin_Exporters {
 
 		if ( ! empty( $_POST['export_types'] ) ) { // WPCS: input var ok.
 			$exporter->set_product_types_to_export( wp_unslash( $_POST['export_types'] ) ); // WPCS: input var ok, sanitization ok.
+		}
+
+		if ( ! empty( $_POST['export_category'] ) && is_array( $_POST['export_category'] ) ) {// WPCS: input var ok.
+			$exporter->set_product_category_to_export( wp_unslash( array_values( $_POST['export_category'] ) ) ); // WPCS: input var ok, sanitization ok.
 		}
 
 		if ( ! empty( $_POST['filename'] ) ) { // WPCS: input var ok.

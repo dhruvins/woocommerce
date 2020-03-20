@@ -5,6 +5,8 @@
  * @package WooCommerce\Log Handlers
  */
 
+use Automattic\Jetpack\Constants;
+
 if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly.
 }
@@ -76,7 +78,7 @@ class WC_Log_Handler_DB extends WC_Log_Handler {
 		);
 
 		if ( ! empty( $context ) ) {
-			$insert['context'] = serialize( $context );
+			$insert['context'] = serialize( $context ); // @codingStandardsIgnoreLine.
 		}
 
 		return false !== $wpdb->insert( "{$wpdb->prefix}woocommerce_log", $insert, $format );
@@ -94,6 +96,23 @@ class WC_Log_Handler_DB extends WC_Log_Handler {
 	}
 
 	/**
+	 * Clear entries for a chosen handle/source.
+	 *
+	 * @param string $source Log source.
+	 * @return bool
+	 */
+	public function clear( $source ) {
+		global $wpdb;
+
+		return $wpdb->query(
+			$wpdb->prepare(
+				"DELETE FROM {$wpdb->prefix}woocommerce_log WHERE source = %s",
+				$source
+			)
+		);
+	}
+
+	/**
 	 * Delete selected logs from DB.
 	 *
 	 * @param int|string|array $log_ids Log ID or array of Log IDs to be deleted.
@@ -107,14 +126,28 @@ class WC_Log_Handler_DB extends WC_Log_Handler {
 			$log_ids = array( $log_ids );
 		}
 
-		$format = array_fill( 0, count( $log_ids ), '%d' );
-
+		$format   = array_fill( 0, count( $log_ids ), '%d' );
 		$query_in = '(' . implode( ',', $format ) . ')';
+		return $wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->prefix}woocommerce_log WHERE log_id IN {$query_in}", $log_ids ) ); // @codingStandardsIgnoreLine.
+	}
 
-		return $wpdb->query(
+	/**
+	 * Delete all logs older than a defined timestamp.
+	 *
+	 * @since 3.4.0
+	 * @param integer $timestamp Timestamp to delete logs before.
+	 */
+	public static function delete_logs_before_timestamp( $timestamp = 0 ) {
+		if ( ! $timestamp ) {
+			return;
+		}
+
+		global $wpdb;
+
+		$wpdb->query(
 			$wpdb->prepare(
-				"DELETE FROM {$wpdb->prefix}woocommerce_log WHERE log_id IN {$query_in}", // phpcs:ignore WordPress.WP.PreparedSQL.NotPrepared
-				$log_ids
+				"DELETE FROM {$wpdb->prefix}woocommerce_log WHERE timestamp < %s",
+				date( 'Y-m-d H:i:s', $timestamp )
 			)
 		);
 	}
@@ -134,13 +167,13 @@ class WC_Log_Handler_DB extends WC_Log_Handler {
 		 *
 		 * @see http://php.net/manual/en/function.debug-backtrace.php#refsect1-function.debug-backtrace-parameters
 		 */
-		if ( defined( 'DEBUG_BACKTRACE_IGNORE_ARGS' ) ) {
-			$debug_backtrace_arg = DEBUG_BACKTRACE_IGNORE_ARGS; // phpcs:ignore PHPCompatibility.PHP.NewConstants.debug_backtrace_ignore_argsFound
+		if ( Constants::is_defined( 'DEBUG_BACKTRACE_IGNORE_ARGS' ) ) {
+			$debug_backtrace_arg = DEBUG_BACKTRACE_IGNORE_ARGS; // phpcs:ignore PHPCompatibility.Constants.NewConstants.debug_backtrace_ignore_argsFound
 		} else {
 			$debug_backtrace_arg = false;
 		}
 
-		$trace = debug_backtrace( $debug_backtrace_arg ); // phpcs:ignore PHPCompatibility.PHP.NewFunctionParameters.debug_backtrace_optionsFound
+		$trace = debug_backtrace( $debug_backtrace_arg ); // @codingStandardsIgnoreLine.
 		foreach ( $trace as $t ) {
 			if ( isset( $t['file'] ) ) {
 				$filename = pathinfo( $t['file'], PATHINFO_FILENAME );

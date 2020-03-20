@@ -1,101 +1,54 @@
-# How To Contribute
+# Contributing to WooCommerce ✨
 
-Community made patches, localizations, bug reports and contributions are always welcome and crucial to ensure WooCommerce remains the leading eCommerce platform for WordPress. WooCommerce currently powers 30% of all online stores across the internet, and your help making it even more awesome will be greatly appreciated :)
+WooCommerce powers many online stores across the internet, and your help making it even more awesome will be greatly appreciated :)
 
-When contributing please ensure you follow the guidelines below to help us keep on top of things.
+There are many ways to contribute to the project!
 
-__Please Note:__
+- [Translating strings into your language](https://github.com/woocommerce/woocommerce/wiki/Translating-WooCommerce).
+- Answering questions on the various WooCommerce communities like the [WP.org support forums](https://wordpress.org/support/plugin/woocommerce/).
+- Testing open [issues](https://github.com/woocommerce/woocommerce/issues) or [pull requests](https://github.com/woocommerce/woocommerce/pulls) and sharing your findings in a comment.
+- Testing WooCommerce beta versions and release candidates. Those are announced in the [WooCommerce development blog](https://woocommerce.wordpress.com/).
+- Submitting fixes, improvements, and enhancements.
+- To disclose a security issue to our team, [please submit a report via HackerOne](https://hackerone.com/automattic/).
 
-GitHub is for _bug reports and contributions only_ - if you have a support question or a request for a customization this is not the right place to post it. Use [WooCommerce Support](https://woocommerce.com/contact-us/) for customer support, [WordPress.org](https://wordpress.org/support/plugin/woocommerce) for community support, and for customizations we recommend one of the following services:
+If you wish to contribute code, please read the information in the sections below. Then [fork](https://help.github.com/articles/fork-a-repo/) WooCommerce, commit your changes, and [submit a pull request](https://help.github.com/articles/using-pull-requests/) 🎉
 
-- [WooExperts](https://woocommerce.com/experts/)
-- [Codeable](https://codeable.io/)
+We use the `good first issue` label to mark issues that are suitable for new contributors. You can find all the issues with this label [here](https://github.com/woocommerce/woocommerce/issues?q=is%3Aopen+is%3Aissue+label%3A%22good+first+issue%22).
 
-## Contributing to Core
+WooCommerce is licensed under the GPLv3+, and all contributions to the project will be released under the same license. You maintain copyright over any contribution you make, and by submitting a pull request, you are agreeing to release that contribution under the GPLv3+ license.
 
-### Reporting Issues
+If you have questions about the process to contribute code or want to discuss details of your contribution, you can contact WooCommerce core developers on the #core channel in the [WooCommerce community Slack](https://woocommerce.com/community-slack/).
 
-Reporting issues is a great way to became a contributor as it doesn't require technical skills. In fact you don't even need to know a programming language or to be able to check the code itself, you just need to make sure that everything works as expected and [submit an issue report](https://github.com/woocommerce/woocommerce/issues/new) if you spot a bug. Sound like something you're up for? Go for it!
+## Getting started
 
-#### How To Submit An Issue Report
+- [How to set up WooCommerce development environment](https://github.com/woocommerce/woocommerce/wiki/How-to-set-up-WooCommerce-development-environment)
+- [Git Flow](https://github.com/woocommerce/woocommerce/wiki/WooCommerce-Git-Flow)
+- [Minification of SCSS and JS](https://github.com/woocommerce/woocommerce/wiki/Minification-of-SCSS-and-JS)
+- [Naming conventions](https://github.com/woocommerce/woocommerce/wiki/Naming-conventions)
+- [String localisation guidelines](https://github.com/woocommerce/woocommerce/wiki/String-localisation-guidelines)
+- [Running unit tests](https://github.com/woocommerce/woocommerce/blob/master/tests/README.md)
+- [Running e2e tests](https://github.com/woocommerce/woocommerce/wiki/End-to-end-Testing)
 
-If something isn't working, congratulations you've found a bug! Help us fix it by submitting an issue report:
+## Coding Guidelines and Development 🛠
 
-* Make sure you have a [GitHub account](https://github.com/signup/free)
-* Search the [Existing Issues](https://github.com/woocommerce/woocommerce/issues) to be sure that the one you've noticed isn't already there
-* Submit a report for your issue
-  * Clearly describe the issue (including steps to reproduce it if it's a bug)
-  * Make sure you fill in the earliest version that you know has the issue.
+- Ensure you stick to the [WordPress Coding Standards](https://make.wordpress.org/core/handbook/best-practices/coding-standards/php/)
+- Run our build process described in the document on [how to set up WooCommerce development environment](https://github.com/woocommerce/woocommerce/wiki/How-to-set-up-WooCommerce-development-environment), it will install our pre-commit hook, code sniffs, dependencies, and more.
+- Whenever possible please fix pre-existing code standards errors in the files that you change. It is ok to skip that for larger files or complex fixes.
+- Ensure you use LF line endings in your code editor. Use [EditorConfig](http://editorconfig.org/) if your editor supports it so that indentation, line endings and other settings are auto configured.
+- When committing, reference your issue number (#1234) and include a note about the fix.
+- Ensure that your code supports the minimum supported versions of PHP and WordPress; this is shown at the top of the `readme.txt` file.
+- Push the changes to your fork and submit a pull request on the master branch of the WooCommerce repository.
+- Make sure to write good and detailed commit messages (see [this post](https://chris.beams.io/posts/git-commit/) for more on this) and follow all the applicable sections of the pull request template.
+- Please avoid modifying the changelog directly or updating the .pot files. These will be updated by the WooCommerce team.
 
-### Making Changes
+If you are contributing code to the REST API or editor blocks, these are developed in external packages.
+- [WooCommerce REST API package](https://github.com/woocommerce/woocommerce-rest-api)
+- [Blocks](https://github.com/woocommerce/woocommerce-gutenberg-products-block)
 
-Making changes to the core is a key way to help us improve WooCommerce. You will need some technical skills to make a change, like knowing a bit of PHP, CSS, SASS or JavaScript.
+## Feature Requests 🚀
 
-If you think something could be improved and you're able to do so, make your changes and submit a Pull Request. We'll be pleased to get it :)
+Feature requests can be [submitted to our issue tracker](https://github.com/woocommerce/woocommerce/issues/new?template=6-Feature-request.md). Be sure to include a description of the expected behavior and use case, and before submitting a request, please search for similar ones in the closed issues.
 
-#### How To Submit A PR
+Feature request issues will remain closed until we see sufficient interest via comments and [👍 reactions](https://help.github.com/articles/about-discussions-in-issues-and-pull-requests/) from the community.
 
-* Fork the repository on GitHub
-* Make the changes to your forked repository
-  * **Ensure you stick to the [WordPress Coding Standards](https://make.wordpress.org/core/handbook/coding-standards/php/)**
-    * Install our pre-commit hook using composer. It'll help with the Coding Standards. To install just run `composer install`
-  * Ensure you use LF line endings - no crazy Windows line endings please :)
-    * Optionally it's possible install [EditorConfig](http://editorconfig.org/) on your editor to auto configure with indentation, line endings and other settings
-* When committing, reference your issue number (#1234) and include a note about the fix
-* Push the changes to your fork and submit a pull request on the master branch of the WooCommerce repository. Existing maintenance branches will be maintained by WooCommerce developers
-* Please **don't** modify the changelog - this will be maintained by the WooCommerce developers.
-* Please **don't** add your localizations or update the .pot files - these will also be maintained by the WooCommerce developers. To contribute to the localization of WooCommerce, please join the [translate.wordpress.org project](https://translate.wordpress.org/projects/wp-plugins/woocommerce). This is much needed, if you speak a language that needs translating consider yourself officially invited to the party.
-
-After you follow the step above, the next stage will be waiting on us to merge your Pull Request. We review them all, and make suggestions and changes as and if necessary.
-
-## Contribute To Localizing WooCommerce
-
-Localization is a very important part of WooCommerce. We believe in net neutrality and want our platform to be available to everyone, everywhere with equal ease. When you localize WooCommerce, you are helping hundreds of people in the world, and all the people who speak your language. That's pretty neat.
-
-### Glossary & Style Guide
-
-Please refer to this page on the [Translator Handbook](https://make.wordpress.org/polyglots/handbook/translating/glossary-style-guide/) for information about the glossary and the style guide.
-
-We maintain the WooCommerce glossary [on this shared Google Sheet](https://docs.google.com/spreadsheets/d/1Pobl2nNWieaSpZND9-Bwa4G8pnMU7QYceKsXuWCwSxQ/edit?usp=sharing). You can use it as a template for creating your own glossary.
-Please download the file by going to **File > Download as > Comma-separated values (.csv, current sheet)** and save it on your computer/Mac. Open it with your favourite CSV editor (or re-upload it on your own Google Drive) and edit it.
-
-Make sure to edit the second column’s header by using your own language’s code (eg. for Italian you would use `it`, for Portuguese (Brazil) you would use `pt-BR`).
-
-Write the translated entry in this column and translate the entry description as well.
-Don’t change other columns headers and value, but feel free to add new entries.
-
-When your CSV is ready, import it on GlotPress.
-
-_**Warning**: Importing a CSV does not replace existing items, they will be created again. We suggest to import them only when first creating the glossary._
-
-Each translation editor will take care of updating the glossary on GlotPress by editing/adding items when needed.
-
-_**Note**: Only editors can create/import and edit glossaries and glossary items on GlotPress. Anyone can suggest new items to add to the glossary or translate them._
-
-**Style Guides Available**
-
-We don’t have a Style Guide template available, so feel free to create your own. Here are the style guides available at the moment:
-
-* [Italian](https://docs.google.com/document/d/1rspopHOiTL-5-PjyG5eJxjkYk6JkzqVbyS24OdA052o/edit?usp=sharing)
-
-If you created a style guide for your language, please let us know so we can add it in the list above. You can also add it by yourself by submitting a PR for this file.
-
-### Translating Core
-
-We have a [project on translate.wordpress.org](https://translate.wordpress.org/projects/wp-plugins/woocommerce). You can join the localization team of your language and help by translating WooCommerce. [Find more about using joining a language team and using GlotPress](https://make.wordpress.org/polyglots/handbook/tools/glotpress-translate-wordpress-org/).
-
-If WooCommerce is already 100% translated for your language, join the team anyway! We regularly update our language files and there will definitely be need of your help soon.
-
-### Translating Video Tutorials
-
-Another valuable way to help is by translating our growing library of WooCommerce video tutorials. Check out the [Translating  Our Videos](https://docs.woocommerce.com/document/translating-our-videos/) doc and join in!
-
-By translating video tutorials you'll be helping non-English speaking users and people affected by disabilities to get to grips with using WooCommerce for the first time, and to go on and create their businesses and make a living! That's something to be proud of and if you choose to dive into this area, we salute you.
-
-# Additional Resources
-
-* [General GitHub documentation](https://help.github.com/)
-* [GitHub pull request documentation](https://help.github.com/articles/about-pull-requests/)
-* [Translator Handbook](https://make.wordpress.org/polyglots/handbook/)
-* [WooCommerce Docs](https://docs.woocommerce.com/)
-* [WooCommerce Support](https://support.woocommerce.com)
+You can see a [list of current feature requests which require votes here](https://github.com/woocommerce/woocommerce/issues?q=label%3A%22votes+needed%22+label%3Aenhancement+sort%3Areactions-%2B1-desc+is%3Aclosed).

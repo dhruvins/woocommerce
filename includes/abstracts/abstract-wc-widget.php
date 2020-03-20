@@ -6,6 +6,8 @@
  * @package  WooCommerce/Abstracts
  */
 
+use Automattic\Jetpack\Constants;
+
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
@@ -59,8 +61,8 @@ abstract class WC_Widget extends WP_Widget {
 	 */
 	public function __construct() {
 		$widget_ops = array(
-			'classname'   => $this->widget_cssclass,
-			'description' => $this->widget_description,
+			'classname'                   => $this->widget_cssclass,
+			'description'                 => $this->widget_description,
 			'customize_selective_refresh' => true,
 		);
 
@@ -78,14 +80,19 @@ abstract class WC_Widget extends WP_Widget {
 	 * @return bool true if the widget is cached otherwise false
 	 */
 	public function get_cached_widget( $args ) {
-		$cache = wp_cache_get( apply_filters( 'woocommerce_cached_widget_id', $this->widget_id ), 'widget' );
+		// Don't get cache if widget_id doesn't exists.
+		if ( empty( $args['widget_id'] ) ) {
+			return false;
+		}
+
+		$cache = wp_cache_get( $this->get_widget_id_for_cache( $this->widget_id ), 'widget' );
 
 		if ( ! is_array( $cache ) ) {
 			$cache = array();
 		}
 
-		if ( isset( $cache[ $args['widget_id'] ] ) ) {
-			echo $cache[ $args['widget_id'] ]; // phpcs:ignore WordPress.XSS.EscapeOutput.OutputNotEscaped
+		if ( isset( $cache[ $this->get_widget_id_for_cache( $args['widget_id'] ) ] ) ) {
+			echo $cache[ $this->get_widget_id_for_cache( $args['widget_id'] ) ]; // phpcs:ignore WordPress.XSS.EscapeOutput.OutputNotEscaped
 			return true;
 		}
 
@@ -100,15 +107,20 @@ abstract class WC_Widget extends WP_Widget {
 	 * @return string the content that was cached
 	 */
 	public function cache_widget( $args, $content ) {
-		$cache = wp_cache_get( apply_filters( 'woocommerce_cached_widget_id', $this->widget_id ), 'widget' );
+		// Don't set any cache if widget_id doesn't exist.
+		if ( empty( $args['widget_id'] ) ) {
+			return $content;
+		}
+
+		$cache = wp_cache_get( $this->get_widget_id_for_cache( $this->widget_id ), 'widget' );
 
 		if ( ! is_array( $cache ) ) {
 			$cache = array();
 		}
 
-		$cache[ $args['widget_id'] ] = $content;
+		$cache[ $this->get_widget_id_for_cache( $args['widget_id'] ) ] = $content;
 
-		wp_cache_set( apply_filters( 'woocommerce_cached_widget_id', $this->widget_id ), $cache, 'widget' );
+		wp_cache_set( $this->get_widget_id_for_cache( $this->widget_id ), $cache, 'widget' );
 
 		return $content;
 	}
@@ -117,7 +129,27 @@ abstract class WC_Widget extends WP_Widget {
 	 * Flush the cache.
 	 */
 	public function flush_widget_cache() {
-		wp_cache_delete( apply_filters( 'woocommerce_cached_widget_id', $this->widget_id ), 'widget' );
+		foreach ( array( 'https', 'http' ) as $scheme ) {
+			wp_cache_delete( $this->get_widget_id_for_cache( $this->widget_id, $scheme ), 'widget' );
+		}
+	}
+
+	/**
+	 * Get this widgets title.
+	 *
+	 * @param array $instance Array of instance options.
+	 * @return string
+	 */
+	protected function get_instance_title( $instance ) {
+		if ( isset( $instance['title'] ) ) {
+			return $instance['title'];
+		}
+
+		if ( isset( $this->settings, $this->settings['title'], $this->settings['title']['std'] ) ) {
+			return $this->settings['title']['std'];
+		}
+
+		return '';
 	}
 
 	/**
@@ -129,7 +161,9 @@ abstract class WC_Widget extends WP_Widget {
 	public function widget_start( $args, $instance ) {
 		echo $args['before_widget']; // phpcs:ignore WordPress.XSS.EscapeOutput.OutputNotEscaped
 
-		if ( $title = apply_filters( 'widget_title', empty( $instance['title'] ) ? '' : $instance['title'], $instance, $this->id_base ) ) { // phpcs:ignore Squiz.PHP.DisallowMultipleAssignments.Found, WordPress.CodeAnalysis.AssignmentInCondition.Found
+		$title = apply_filters( 'widget_title', $this->get_instance_title( $instance ), $instance, $this->id_base );
+
+		if ( $title ) {
 			echo $args['before_title'] . $title . $args['after_title']; // phpcs:ignore WordPress.XSS.EscapeOutput.OutputNotEscaped
 		}
 	}
@@ -185,7 +219,7 @@ abstract class WC_Widget extends WP_Widget {
 					$instance[ $key ] = empty( $new_instance[ $key ] ) ? 0 : 1;
 					break;
 				default:
-					$instance[ $key ] = sanitize_text_field( $new_instance[ $key ] );
+					$instance[ $key ] = isset( $new_instance[ $key ] ) ? sanitize_text_field( $new_instance[ $key ] ) : $setting['std'];
 					break;
 			}
 
@@ -223,7 +257,7 @@ abstract class WC_Widget extends WP_Widget {
 				case 'text':
 					?>
 					<p>
-						<label for="<?php echo esc_attr( $this->get_field_id( $key ) ); ?>"><?php echo $setting['label']; ?></label><?php // phpcs:ignore WordPress.XSS.EscapeOutput.OutputNotEscaped ?>
+						<label for="<?php echo esc_attr( $this->get_field_id( $key ) ); ?>"><?php echo wp_kses_post( $setting['label'] ); ?></label><?php // phpcs:ignore WordPress.XSS.EscapeOutput.OutputNotEscaped ?>
 						<input class="widefat <?php echo esc_attr( $class ); ?>" id="<?php echo esc_attr( $this->get_field_id( $key ) ); ?>" name="<?php echo esc_attr( $this->get_field_name( $key ) ); ?>" type="text" value="<?php echo esc_attr( $value ); ?>" />
 					</p>
 					<?php
@@ -287,7 +321,7 @@ abstract class WC_Widget extends WP_Widget {
 	 * @since  3.3.0
 	 */
 	protected function get_current_page_url() {
-		if ( defined( 'SHOP_IS_ON_FRONT' ) ) {
+		if ( Constants::is_defined( 'SHOP_IS_ON_FRONT' ) ) {
 			$link = home_url();
 		} elseif ( is_shop() ) {
 			$link = get_permalink( wc_get_page_id( 'shop' ) );
@@ -297,7 +331,7 @@ abstract class WC_Widget extends WP_Widget {
 			$link = get_term_link( get_query_var( 'product_tag' ), 'product_tag' );
 		} else {
 			$queried_object = get_queried_object();
-			$link = get_term_link( $queried_object->slug, $queried_object->taxonomy );
+			$link           = get_term_link( $queried_object->slug, $queried_object->taxonomy );
 		}
 
 		// Min/Max.
@@ -325,6 +359,11 @@ abstract class WC_Widget extends WP_Widget {
 		// Post Type Arg.
 		if ( isset( $_GET['post_type'] ) ) {
 			$link = add_query_arg( 'post_type', wc_clean( wp_unslash( $_GET['post_type'] ) ), $link );
+
+			// Prevent post type and page id when pretty permalinks are disabled.
+			if ( is_shop() ) {
+				$link = remove_query_arg( 'page_id', $link );
+			}
 		}
 
 		// Min Rating Arg.
@@ -335,7 +374,7 @@ abstract class WC_Widget extends WP_Widget {
 		// All current filters.
 		if ( $_chosen_attributes = WC_Query::get_layered_nav_chosen_attributes() ) { // phpcs:ignore Squiz.PHP.DisallowMultipleAssignments.Found, WordPress.CodeAnalysis.AssignmentInCondition.Found
 			foreach ( $_chosen_attributes as $name => $data ) {
-				$filter_name = sanitize_title( str_replace( 'pa_', '', $name ) );
+				$filter_name = wc_attribute_taxonomy_slug( $name );
 				if ( ! empty( $data['terms'] ) ) {
 					$link = add_query_arg( 'filter_' . $filter_name, implode( ',', $data['terms'] ), $link );
 				}
@@ -345,6 +384,24 @@ abstract class WC_Widget extends WP_Widget {
 			}
 		}
 
-		return $link;
+		return apply_filters( 'woocommerce_widget_get_current_page_url', $link, $this );
+	}
+
+	/**
+	 * Get widget id plus scheme/protocol to prevent serving mixed content from (persistently) cached widgets.
+	 *
+	 * @since  3.4.0
+	 * @param  string $widget_id Id of the cached widget.
+	 * @param  string $scheme    Scheme for the widget id.
+	 * @return string            Widget id including scheme/protocol.
+	 */
+	protected function get_widget_id_for_cache( $widget_id, $scheme = '' ) {
+		if ( $scheme ) {
+			$widget_id_for_cache = $widget_id . '-' . $scheme;
+		} else {
+			$widget_id_for_cache = $widget_id . '-' . ( is_ssl() ? 'https' : 'http' );
+		}
+
+		return apply_filters( 'woocommerce_cached_widget_id', $widget_id_for_cache );
 	}
 }
